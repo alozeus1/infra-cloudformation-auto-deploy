@@ -1,4 +1,4 @@
-name: Deploy CloudFormation (Create + Update + Notifications)
+name: Deploy CloudFormation (Smarter Change Set Handling)
 
 on:
   push:
@@ -47,9 +47,15 @@ jobs:
               if [ "$STATUS" = "CREATE_COMPLETE" ]; then
                 break
               elif [[ "$STATUS" == *FAILED* ]]; then
-                echo "Change Set Failed."
-                aws sns publish --topic-arn ${{ secrets.SNS_TOPIC_ARN }} --message "CloudFormation Change Set failed for $STACK_NAME"
-                exit 1
+                CHANGE_SET_STATUS_REASON=$(aws cloudformation describe-change-set --stack-name $STACK_NAME --change-set-name $CHANGE_SET_NAME --query 'StatusReason' --output text)
+                if [[ "$CHANGE_SET_STATUS_REASON" == *"didn't contain changes"* ]]; then
+                  echo "No changes to apply. Skipping execution."
+                  exit 0
+                else
+                  echo "Change Set Failed."
+                  aws sns publish --topic-arn ${{ secrets.SNS_TOPIC_ARN }} --message "CloudFormation Change Set failed for $STACK_NAME: $CHANGE_SET_STATUS_REASON"
+                  exit 1
+                fi
               fi
               sleep 5
             done
