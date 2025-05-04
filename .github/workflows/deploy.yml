@@ -1,4 +1,4 @@
-name: Deploy CloudFormation with Change Set
+name: Deploy CloudFormation with Create or Change Set
 
 on:
   push:
@@ -24,36 +24,39 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Create Change Set
+      - name: Deploy CloudFormation Stack (Create or Update)
         run: |
-          aws cloudformation create-change-set \
-            --stack-name $STACK_NAME \
-            --template-body file://templates/my-s3-stack.yaml \
-            --parameters ParameterKey=BucketName,ParameterValue=my-github-s3-cft-demo \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --change-set-name $CHANGE_SET_NAME || true
+          set -e
 
-      - name: Wait for Change Set
-        run: |
-          while true; do
-            STATUS=$(aws cloudformation describe-change-set --stack-name $STACK_NAME --change-set-name $CHANGE_SET_NAME --query 'Status' --output text)
-            if [ "$STATUS" = "CREATE_COMPLETE" ]; then
-              echo "Change Set Ready."
-              break
-            elif [[ "$STATUS" == *FAILED* ]]; then
-              echo "Change Set Failed. Sending notification."
-              aws sns publish --topic-arn arn:aws:sns:${{ secrets.AWS_REGION }}:GitHubDeployment:9db87d01-a152-45b1-b33e-de76fdbe3bec --message "CloudFormation Change Set failed for $STACK_NAME"
-              exit 1
-            fi
+          STACK_EXISTS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_EXIST")
+
+          if [ "$STACK_EXISTS" = "NOT_EXIST" ]; then
+            echo "Stack does not exist, creating new stack..."
+            aws cloudformation create-stack               --stack-name $STACK_NAME               --template-body file://templates/my-s3-stack.yaml               --parameters ParameterKey=BucketName,ParameterValue=my-github-s3-cft-demo               --capabilities CAPABILITY_NAMED_IAM
+
+            echo "Waiting for stack creation to complete..."
+            aws cloudformation wait stack-create-complete --stack-name $STACK_NAME
+            echo "✅ Stack created successfully."
+          else
+            echo "Stack exists, creating change set..."
+            aws cloudformation create-change-set               --stack-name $STACK_NAME               --template-body file://templates/my-s3-stack.yaml               --parameters ParameterKey=BucketName,ParameterValue=my-github-s3-cft-demo               --capabilities CAPABILITY_NAMED_IAM               --change-set-name $CHANGE_SET_NAME || true
+
             echo "Waiting for Change Set to be ready..."
-            sleep 5
-          done
+            while true; do
+              STATUS=$(aws cloudformation describe-change-set --stack-name $STACK_NAME --change-set-name $CHANGE_SET_NAME --query 'Status' --output text)
+              if [ "$STATUS" = "CREATE_COMPLETE" ]; then
+                break
+              elif [[ "$STATUS" == *FAILED* ]]; then
+                echo "Change Set Failed."
+                aws sns publish --topic-arn arn:aws:sns:${{ secrets.AWS_REGION }}:GitHubDeployment:9db87d01-a152-45b1-b33e-de76fdbe3bec --message "CloudFormation Change Set failed for $STACK_NAME"
+                exit 1
+              fi
+              sleep 5
+            done
 
-      - name: Execute Change Set
-        run: |
-          aws cloudformation execute-change-set \
-            --stack-name $STACK_NAME \
-            --change-set-name $CHANGE_SET_NAME
+            aws cloudformation execute-change-set --stack-name $STACK_NAME --change-set-name $CHANGE_SET_NAME
+            echo "✅ Change Set executed successfully."
+          fi
 
       - name: Slack Notification Success
         if: success()
@@ -61,7 +64,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "✅ CloudFormation stack $STACK_NAME successfully updated."
+              "text": "✅ CloudFormation stack $STACK_NAME successfully created or updated."
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
