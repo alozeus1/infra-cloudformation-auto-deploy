@@ -12,4 +12,9 @@ This repository contains CloudFormation templates and a GitHub Actions workflow 
 
 - Configure AWS credentials in GitHub Secrets: Got to the repo page and click settings
 - In the settings page, left panel click Secrets and variables and then click Actions
-- Click the 'New repository secret' tab to add your crednetials.
+- Click the 'New repository secret' tab to add your credentials.
+- Add the Key and Values:
+*** AWS_ACCESS_KEY_ID ***
+*** AWS_SECRET_ACCESS_KEY ***
+*** AWS_REGION ***
+
