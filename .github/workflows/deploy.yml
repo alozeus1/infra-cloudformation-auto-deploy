@@ -1,4 +1,4 @@
-name: Deploy CloudFormation with Create or Change Set
+name: Deploy CloudFormation (Create + Update + Notifications)
 
 on:
   push:
@@ -48,7 +48,7 @@ jobs:
                 break
               elif [[ "$STATUS" == *FAILED* ]]; then
                 echo "Change Set Failed."
-                aws sns publish --topic-arn arn:aws:sns:${{ secrets.AWS_REGION }}:GitHubDeployment --message "CloudFormation Change Set failed for $STACK_NAME"
+                aws sns publish --topic-arn ${{ secrets.SNS_TOPIC_ARN }} --message "CloudFormation Change Set failed for $STACK_NAME"
                 exit 1
               fi
               sleep 5
@@ -64,7 +64,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "✅ CloudFormation stack $STACK_NAME successfully created or updated."
+              "text": "✅ CloudFormation stack ${{ env.STACK_NAME }} successfully created or updated."
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
