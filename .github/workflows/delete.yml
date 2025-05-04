@@ -11,13 +11,12 @@ jobs:
   delete:
     runs-on: ubuntu-latest
 
+    env:
+      STACK_NAME: MyS3BucketStack
+
     steps:
-      - name: Check confirmation
-        run: |
-          if [ "${{ github.event.inputs.confirm_delete }}" != "YES" ]; then
-            echo "❌ Delete confirmation not provided. Exiting."
-            exit 1
-          fi
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -26,11 +25,63 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Check confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_delete }}" != "YES" ]; then
+            echo "You must type YES to confirm stack deletion."
+            exit 1
+          fi
+
       - name: Delete CloudFormation Stack
         run: |
-          aws cloudformation delete-stack             --stack-name MyS3BucketStack
-
+          aws cloudformation delete-stack --stack-name $STACK_NAME
           echo "Waiting for stack deletion to complete..."
-          aws cloudformation wait stack-delete-complete             --stack-name MyS3BucketStack
-
+          aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME
           echo "✅ Stack deleted successfully."
+
+      - name: Slack Notification (Stack Deleted)
+        if: success()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "CloudFormation stack ${{ env.STACK_NAME }} has been deleted.",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":wastebasket: *CloudFormation Stack Deleted*"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Stack Name:*\n${{ env.STACK_NAME }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:*\nDeleted"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Triggered from *GitHub Actions* :github:"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: SNS Notification (Stack Deleted)
+        if: success()
+        run: |
+          aws sns publish --topic-arn ${{ secrets.SNS_TOPIC_ARN }} --message "CloudFormation Stack $STACK_NAME has been deleted from AWS."
