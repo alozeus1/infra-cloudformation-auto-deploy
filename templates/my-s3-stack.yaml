@@ -12,8 +12,8 @@ Resources:
     Properties:
       BucketName: !Ref BucketName
       # Uncomment to enable Versioning
-       VersioningConfiguration:
-         Status: Enabled
+      VersioningConfiguration:
+        Status: Enabled
 
       # Uncomment to enable Bucket Encryption
       # BucketEncryption:
