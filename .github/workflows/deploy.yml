@@ -1,4 +1,4 @@
-name: Deploy CloudFormation (Smarter Change Set Handling)
+name: Deploy CloudFormation (Smarter + Advanced Slack)
 
 on:
   push:
@@ -64,13 +64,43 @@ jobs:
             echo "✅ Change Set executed successfully."
           fi
 
-      - name: Slack Notification Success
+      - name: Slack Notification Success (Advanced)
         if: success()
         uses: slackapi/slack-github-action@v1.24.0
         with:
           payload: |
             {
-              "text": "✅ CloudFormation stack ${{ env.STACK_NAME }} successfully created or updated."
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":rocket: *CloudFormation Deployment Succeeded!*"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Stack Name:*\n${{ env.STACK_NAME }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Status:*\nSuccessfully Created/Updated"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Triggered from *GitHub Actions* :github:"
+                    }
+                  ]
+                }
+              ]
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
