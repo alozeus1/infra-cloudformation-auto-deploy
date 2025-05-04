@@ -48,7 +48,7 @@ jobs:
                 break
               elif [[ "$STATUS" == *FAILED* ]]; then
                 echo "Change Set Failed."
-                aws sns publish --topic-arn arn:aws:sns:${{ secrets.AWS_REGION }}:GitHubDeployment:9db87d01-a152-45b1-b33e-de76fdbe3bec --message "CloudFormation Change Set failed for $STACK_NAME"
+                aws sns publish --topic-arn arn:aws:sns:us-east-1:108188564905:GitHubDeployment:9db87d01-a152-45b1-b33e-de76fdbe3bec --message "CloudFormation Change Set failed for $STACK_NAME"
                 exit 1
               fi
               sleep 5
